@@ -7,10 +7,11 @@ from aiogram.filters.command import Command
 import requests
 from bs4 import BeautifulSoup
 
-html = requests.get("https://www.avito.ru/izhevsk?q=ssd&s=1").text
-soup = BeautifulSoup(html)
+url = f"https://www.avito.ru/izhevsk?q=диван&s=1"
+html = requests.get(url).text
+bs = BeautifulSoup(html)
 
-info = {'Название': [1, 2], 'Цена': [1, 22]}
+info = {'Название': [0, 0], 'Цена': [0, 0]}
 data = pd.DataFrame(info)
 print(data)
 
@@ -26,24 +27,34 @@ async def cmd_start(message: types.Message):
 
 @dp.message(Command("info"))
 async def get_info(message: types.Message):
+    all_link = bs.find_all("div", {"class": "iva-item-priceStep-uq2CQ"})
+    a = bs.find_all("h3", {"class": "styles-module-root-TWVKW"})
+
     price = []
     name = []
 
-    for el in soup.find_all("strong", {"class": "styles-module-root-LIAav"}):
+    for el in all_link:
+        b = "".join(c for c in el.text if c.isdigit())
         if el.text.lower() in "цена не указана" or el.text.lower() in "бесплатно" or el.text.lower() in "цена договорная":
             price.append(0)
         else:
-            price.append(el.text.replace("0₽", ''))
-    print(price[10:])
+            price.append(f"{int(b)}")
+    print(price)
     print(len(price))
-    for el in soup.find_all("h3", {"itemprop": "name"}):
-        name.append(el.text)
+    for el in a:
+        if "Фильтры" not in el.text:
+            name.append(f"{el.text}")
+    print(name)
     print(len(name))
-    info = {'Цена': price[10:], 'Название': name}
 
+    info = {'Цена': price, 'Название': name}
     data = pd.DataFrame(info)
-    print(data)
-    await message.answer(f"Авито")
+
+    answer = ""
+    if 0 in price:
+        answer += "⚠Предупреждение! Чаще всего товары с ценой 0 плохие по качеству или же имеют договорную цену!⚠"
+        
+    await message.answer(f"{data} {answer}")
 
 
 async def main():
